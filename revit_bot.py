@@ -26,6 +26,20 @@ SYSTEM_PROMPT = """Ты — RevitHelper, эксперт по Autodesk Revit.
 Отвечай на языке пользователя: русский → по-русски, English → in English, O'zbek → o'zbekcha.
 Давай пошаговые инструкции с эмодзи (📌 шаг, ✅ готово, ⚠️ важно, 💡 совет)."""
 
+# ─── База программ и семейств ───
+PROGRAMS = {
+    "revit2024": {
+        "name": "Autodesk Revit 2024",
+        "size": "18 GB (2 части по 2 GB)",
+        "files": []  # сюда добавим file_id
+    },
+    "autocad2024": {
+        "name": "AutoCAD 2024",
+        "size": "5 GB",
+        "files": []  # сюда добавим file_id
+    }
+}
+
 
 def get_user(uid):
     if uid not in user_data:
@@ -43,6 +57,13 @@ def premium_keyboard():
     ]])
 
 
+def programs_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📦 Autodesk Revit 2024", callback_data="dl_revit2024")],
+        [InlineKeyboardButton("📦 AutoCAD 2024", callback_data="dl_autocad2024")],
+    ])
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     u = get_user(update.effective_user.id)
     status = "⭐ Premium" if u["premium"] else f"🆓 Бесплатно ({FREE_LIMIT - u['questions_today']}/{FREE_LIMIT} вопросов)"
@@ -52,10 +73,19 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"✅ Пошаговые инструкции\n"
         f"✅ Объясняю ошибки\n"
         f"✅ Читаю скриншоты\n"
+        f"✅ Скачать Revit и AutoCAD\n"
         f"✅ Русский / English / O'zbek\n\n"
         f"Статус: {status}\n\n"
         f"Просто напиши вопрос или отправь скриншот ⬇️",
         parse_mode="Markdown"
+    )
+
+
+async def cmd_download(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📦 *Скачать программы*\n\nВыбери что хочешь скачать:",
+        parse_mode="Markdown",
+        reply_markup=programs_keyboard()
     )
 
 
@@ -69,9 +99,26 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=premium_keyboard())
 
 
+async def get_file_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    await update.message.reply_text(
+        f"📁 *{doc.file_name}*\n\n`{doc.file_id}`",
+        parse_mode="Markdown"
+    )
+
+
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     u = get_user(uid)
+    text = update.message.text.lower()
+
+    # Проверка на запрос скачивания
+    if any(word in text for word in ["скачать", "download", "revit", "autocad"]):
+        await update.message.reply_text(
+            "📦 Выбери программу для скачивания:",
+            reply_markup=programs_keyboard()
+        )
+        return
 
     if not u["premium"] and u["questions_today"] >= FREE_LIMIT:
         await update.message.reply_text(
@@ -128,7 +175,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             resp = await client.get(tg_file.file_path)
             image_data = base64.b64encode(resp.content).decode()
 
-        caption = update.message.caption or "Что изображено на этом скриншоте? Это связано с Revit? Помоги разобраться."
+        caption = update.message.caption or "Что изображено? Это связано с Revit? Помоги разобраться."
 
         response = groq_client.chat.completions.create(
             model="meta-llama/llama-4-scout-17b-16e-instruct",
@@ -152,6 +199,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     if q.data == "buy_premium":
         await ctx.bot.send_invoice(
             chat_id=q.from_user.id,
@@ -162,6 +210,24 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             prices=[LabeledPrice("Premium", PREMIUM_PRICE_STARS)],
             provider_token=""
         )
+
+    elif q.data == "dl_revit2024":
+        prog = PROGRAMS["revit2024"]
+        if not prog["files"]:
+            await q.message.reply_text("⏳ Файлы скоро будут добавлены! Следи за обновлениями.")
+        else:
+            await q.message.reply_text(f"📦 *{prog['name']}*\n💾 Размер: {prog['size']}\n\nОтправляю файлы...", parse_mode="Markdown")
+            for file_id in prog["files"]:
+                await ctx.bot.send_document(chat_id=q.from_user.id, document=file_id)
+
+    elif q.data == "dl_autocad2024":
+        prog = PROGRAMS["autocad2024"]
+        if not prog["files"]:
+            await q.message.reply_text("⏳ Файлы скоро будут добавлены! Следи за обновлениями.")
+        else:
+            await q.message.reply_text(f"📦 *{prog['name']}*\n💾 Размер: {prog['size']}\n\nОтправляю файлы...", parse_mode="Markdown")
+            for file_id in prog["files"]:
+                await ctx.bot.send_document(chat_id=q.from_user.id, document=file_id)
 
 
 async def pre_checkout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -177,7 +243,9 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("download", cmd_download))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.Document.ALL, get_file_id))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(PreCheckoutQueryHandler(pre_checkout))
