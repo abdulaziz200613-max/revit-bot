@@ -10,8 +10,9 @@ from telegram.ext import (
 from groq import Groq
 
 # ─── ЗАМЕНИ НА СВОИ КЛЮЧИ ───
-TELEGRAM_TOKEN = "7852802734:AAHiwDIQ81jzJTDwK99h4FfWiHG-qayqvWI"
-GROQ_KEY       = "gsk_paXjeQ4jMioHlL16GTzlWGdyb3FYVhMLYAGinQ7L4ZkS8wZeR81"
+import os
+TELEGRAM_TOKEN = os.environ.get("7852802734:AAHiwDIQ81jzJTDwK99h4FfWiHG-qayqvWI")
+GROQ_KEY       = os.environ.get("gsk_paXjeQ4jMioHlL16GTzlWGdyb3FYVhMLYAGinQ7L4ZkS8wZeR81")
 # ────────────────────────────
 
 groq_client = Groq(api_key=GROQ_KEY)
