@@ -10,7 +10,7 @@ from telegram.ext import (
 from groq import Groq
 
 # ─── ЗАМЕНИ НА СВОИ КЛЮЧИ ───
-TELEGRAM_TOKEN = "7852802734:AAGSlgdZuLXW8xi8i345zGTvm1dk63Mzsyg"
+TELEGRAM_TOKEN = "7852802734:AAHiwDIQ81jzJTDwK99h4FfWiHG-qayqvWI"
 GROQ_KEY       = "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"
 # ────────────────────────────
 
